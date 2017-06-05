@@ -195,49 +195,58 @@ enum queue_id_t
 	QUEUE_COUNT
 };
 
-const char QUEUE_NAMES[QUEUE_COUNT][64] = {
-	"moodycamel::ConcurrentQueue",
-	"boost::lockfree::queue",
-	"tbb::concurrent_queue",
-	"SimpleLockFreeQueue",
-	"LockBasedQueue",
-	"std::queue",
+struct queue_data_t {
+	const char name[64];
+	const char notes[128];
+	const bool token_support;
+	// -1 means no limit
+	const int max_threads;
+	const bool benchmark_support[BENCHMARK_TYPE_COUNT];
 };
 
-const char QUEUE_SUMMARY_NOTES[QUEUE_COUNT][128] = {
-	"including bulk",
-	"",
-	"",
-	"",
-	"",
-	"single thread only",
-};
-
-const bool QUEUE_TOKEN_SUPPORT[QUEUE_COUNT] = {
-	true,
-	false,
-	false,
-	false,
-	false,
-	false,
-};
-
-const int QUEUE_MAX_THREADS[QUEUE_COUNT] = {
-	-1,		// no limit
-	-1,
-	-1,
-	-1,
-	-1,
-	1,
-};
-
-const bool QUEUE_BENCH_SUPPORT[QUEUE_COUNT][BENCHMARK_TYPE_COUNT] = {
-	{ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
-	{ 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1 },
-	{ 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1 },
-	{ 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1 },
-	{ 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1 },
-	{ 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0 },
+const queue_data_t queue_info[QUEUE_COUNT] = {
+	{
+		"moodycamel::ConcurrentQueue",
+		"including bulk",
+		true,
+		-1,		// no limit
+		{ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
+	},
+	{
+		"boost::lockfree::queue",
+		"",
+		false,
+		-1,
+		{ 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1 },
+	},
+	{
+		"tbb::concurrent_queue",
+		"",
+		false,
+		-1,
+		{ 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1 },
+	},
+	{
+		"SimpleLockFreeQueue",
+		"",
+		false,
+		-1,
+		{ 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1 },
+	},
+	{
+		"LockBasedQueue",
+		"",
+		false,
+		-1,
+		{ 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1 },
+	},
+	{
+		"std::queue",
+		"single thread only",
+		false,
+		1,
+		{ 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0 },
+	},
 };
 
 
@@ -1897,7 +1906,7 @@ int main(int argc, char** argv)
 		
 		bool anyQueueSupportsBenchmark = false;
 		for (int queue = 0; queue != QUEUE_COUNT; ++queue) {
-			if (QUEUE_BENCH_SUPPORT[queue][benchmark]) {
+			if (queue_info[queue].benchmark_support[benchmark]) {
 				anyQueueSupportsBenchmark = true;
 				break;
 			}
@@ -1920,21 +1929,21 @@ int main(int argc, char** argv)
 		sayf(indent, "(%s)\n", BENCHMARK_DESCS[benchmark]);
 		
 		for (int queue = 0; queue != QUEUE_COUNT; ++queue) {
-			sayf(indent, "> %s\n", QUEUE_NAMES[queue]);
+			sayf(indent, "> %s\n", queue_info[queue].name);
 			
-			if (!QUEUE_BENCH_SUPPORT[queue][benchmark]) {
+			if (!queue_info[queue].benchmark_support[benchmark]) {
 				sayf(indent + 3, "(skipping, benchmark not supported...)\n\n");
 				continue;
 			}
 			
-			if (QUEUE_TOKEN_SUPPORT[queue]) {
+			if (queue_info[queue].token_support) {
 				indent += 4;
 			}
 			for (int useTokens = 0; useTokens != 2; ++useTokens) {
-				if (QUEUE_TOKEN_SUPPORT[queue]) {
+				if (queue_info[queue].token_support) {
 					sayf(indent, "%s tokens\n", useTokens == 0 ? "Without" : "With");
 				}
-				if (useTokens == 1 && !QUEUE_TOKEN_SUPPORT[queue]) {
+				if (useTokens == 1 && !queue_info[queue].token_support) {
 					continue;
 				}
 				indent += 3;
@@ -1951,7 +1960,7 @@ int main(int argc, char** argv)
 					if (logicalCores > 0 && (unsigned int)nthreads > 3 * logicalCores) {
 						continue;
 					}
-					if (QUEUE_MAX_THREADS[queue] >= 0 && QUEUE_MAX_THREADS[queue] < nthreads) {
+					if (queue_info[queue].max_threads >= 0 && queue_info[queue].max_threads < nthreads) {
 						continue;
 					}
 					
@@ -1980,7 +1989,7 @@ int main(int argc, char** argv)
 					}
 					//std::printf("maxOps: %llu\n", maxOps);
 					
-					int maxThreads = QUEUE_MAX_THREADS[queue];
+					int maxThreads = queue_info[queue].max_threads;
 					std::vector<BenchmarkResult> results(ITERATIONS);
 					for (int i = 0; i < ITERATIONS; ++i) {
 						double elapsed;
@@ -2059,7 +2068,7 @@ int main(int argc, char** argv)
 				
 				indent -= 3;
 			}
-			if (QUEUE_TOKEN_SUPPORT[queue]) {
+			if (queue_info[queue].token_support) {
 				indent -= 4;
 			}
 		}
@@ -2070,11 +2079,11 @@ int main(int argc, char** argv)
 	sayf(0, "(Take this summary with a grain of salt -- look at the individual benchmark results for a much\nbetter idea of how the queues measure up to each other):\n");
 	for (int queue = 0; queue != QUEUE_COUNT; ++queue) {
 		opsst = safe_divide(totalWeightedOpsst[queue], totalWeight[queue]);
-		if (QUEUE_SUMMARY_NOTES[queue] != nullptr && QUEUE_SUMMARY_NOTES[queue][0] != '\0') {
-			sayf(4, "%s (%s): %7s\n", QUEUE_NAMES[queue], QUEUE_SUMMARY_NOTES[queue], opsst == 0 ? "(n/a)" : pretty(opsst));
+		if (queue_info[queue].notes != nullptr && queue_info[queue].notes[0] != '\0') {
+			sayf(4, "%s (%s): %7s\n", queue_info[queue].name, queue_info[queue].notes, opsst == 0 ? "(n/a)" : pretty(opsst));
 		}
 		else {
-			sayf(4, "%s: %7s\n", QUEUE_NAMES[queue], opsst == 0 ? "(n/a)" : pretty(opsst));
+			sayf(4, "%s: %7s\n", queue_info[queue].name, opsst == 0 ? "(n/a)" : pretty(opsst));
 		}
 	}
 	
