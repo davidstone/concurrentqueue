@@ -40,6 +40,16 @@ typedef std::minstd_rand RNG_t;
 bool precise = false;
 
 
+// Visual Studio 2012 is still supported, and it does not support constexpr, so
+// we need to use this old way of determining an array size
+
+template<typename T>
+struct array_size;
+
+template<typename T, std::size_t n>
+struct array_size<T[n]> : std::integral_constant<std::size_t, n> {};
+
+
 enum benchmark_type_t
 {
 	bench_balanced,
@@ -191,8 +201,6 @@ enum queue_id_t
 	queue_simplelockfree,
 	queue_lockbased,
 	queue_std,
-	
-	QUEUE_COUNT
 };
 
 struct queue_data_t {
@@ -202,15 +210,17 @@ struct queue_data_t {
 	// -1 means no limit
 	const int max_threads;
 	const bool benchmark_support[BENCHMARK_TYPE_COUNT];
+	queue_id_t id;
 };
 
-const queue_data_t queue_info[QUEUE_COUNT] = {
+const queue_data_t queue_info[] = {
 	{
 		"moodycamel::ConcurrentQueue",
 		"including bulk",
 		true,
 		-1,		// no limit
 		{ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
+		queue_moodycamel_ConcurrentQueue
 	},
 	{
 		"boost::lockfree::queue",
@@ -218,6 +228,7 @@ const queue_data_t queue_info[QUEUE_COUNT] = {
 		false,
 		-1,
 		{ 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1 },
+		queue_boost
 	},
 	{
 		"tbb::concurrent_queue",
@@ -225,6 +236,7 @@ const queue_data_t queue_info[QUEUE_COUNT] = {
 		false,
 		-1,
 		{ 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1 },
+		queue_tbb,
 	},
 	{
 		"SimpleLockFreeQueue",
@@ -232,6 +244,7 @@ const queue_data_t queue_info[QUEUE_COUNT] = {
 		false,
 		-1,
 		{ 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1 },
+		queue_simplelockfree,
 	},
 	{
 		"LockBasedQueue",
@@ -239,6 +252,7 @@ const queue_data_t queue_info[QUEUE_COUNT] = {
 		false,
 		-1,
 		{ 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1 },
+		queue_lockbased,
 	},
 	{
 		"std::queue",
@@ -246,6 +260,7 @@ const queue_data_t queue_info[QUEUE_COUNT] = {
 		false,
 		1,
 		{ 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0 },
+		queue_std,
 	},
 };
 
@@ -1884,12 +1899,9 @@ int main(int argc, char** argv)
 	
 	double opsst = 0;		// ops/s/thread
 	
-	double totalWeightedOpsst[QUEUE_COUNT];
-	double totalWeight[QUEUE_COUNT];
-	for (int i = 0; i != QUEUE_COUNT; ++i) {
-		totalWeightedOpsst[i] = 0;
-		totalWeight[i] = 0;
-	}
+	std::size_t const queueCount = array_size<decltype(queue_info)>::value;
+	double totalWeightedOpsst[queueCount] = {};
+	double totalWeight[queueCount] = {};
 	
 	auto logicalCores = std::thread::hardware_concurrency();
 	
@@ -1905,8 +1917,8 @@ int main(int argc, char** argv)
 		auto seed = randSeeds[benchmark];
 		
 		bool anyQueueSupportsBenchmark = false;
-		for (int queue = 0; queue != QUEUE_COUNT; ++queue) {
-			if (queue_info[queue].benchmark_support[benchmark]) {
+		for (auto const & queue : queue_info) {
+			if (queue.benchmark_support[benchmark]) {
 				anyQueueSupportsBenchmark = true;
 				break;
 			}
@@ -1928,22 +1940,22 @@ int main(int argc, char** argv)
 		indent += 2;
 		sayf(indent, "(%s)\n", BENCHMARK_DESCS[benchmark]);
 		
-		for (int queue = 0; queue != QUEUE_COUNT; ++queue) {
-			sayf(indent, "> %s\n", queue_info[queue].name);
+		for (auto const & queue : queue_info) {
+			sayf(indent, "> %s\n", queue.name);
 			
-			if (!queue_info[queue].benchmark_support[benchmark]) {
+			if (!queue.benchmark_support[benchmark]) {
 				sayf(indent + 3, "(skipping, benchmark not supported...)\n\n");
 				continue;
 			}
 			
-			if (queue_info[queue].token_support) {
+			if (queue.token_support) {
 				indent += 4;
 			}
 			for (int useTokens = 0; useTokens != 2; ++useTokens) {
-				if (queue_info[queue].token_support) {
+				if (queue.token_support) {
 					sayf(indent, "%s tokens\n", useTokens == 0 ? "Without" : "With");
 				}
-				if (useTokens == 1 && !queue_info[queue].token_support) {
+				if (useTokens == 1 && !queue.token_support) {
 					continue;
 				}
 				indent += 3;
@@ -1960,12 +1972,12 @@ int main(int argc, char** argv)
 					if (logicalCores > 0 && (unsigned int)nthreads > 3 * logicalCores) {
 						continue;
 					}
-					if (queue_info[queue].max_threads >= 0 && queue_info[queue].max_threads < nthreads) {
+					if (queue.max_threads >= 0 && queue.max_threads < nthreads) {
 						continue;
 					}
 					
-					counter_t maxOps;
-					switch ((queue_id_t)queue) {
+					counter_t maxOps = 0;
+					switch (queue.id) {
 					case queue_moodycamel_ConcurrentQueue:
 						maxOps = determineMaxOpsForBenchmark<moodycamel::ConcurrentQueue<int, Traits>>((benchmark_type_t)benchmark, nthreads, (bool)useTokens, seed);
 						break;
@@ -1989,13 +2001,13 @@ int main(int argc, char** argv)
 					}
 					//std::printf("maxOps: %llu\n", maxOps);
 					
-					int maxThreads = queue_info[queue].max_threads;
+					int maxThreads = queue.max_threads;
 					std::vector<BenchmarkResult> results(ITERATIONS);
 					for (int i = 0; i < ITERATIONS; ++i) {
-						double elapsed;
+						double elapsed = 0.0;
 						counter_t ops = 0;
 						
-						switch ((queue_id_t)queue) {
+						switch (queue.id) {
 						case queue_moodycamel_ConcurrentQueue:
 							elapsed = runBenchmark<moodycamel::ConcurrentQueue<int, Traits>>((benchmark_type_t)benchmark, nthreads, (bool)useTokens, seed, maxOps, maxThreads, ops);
 							break;
@@ -2059,16 +2071,16 @@ int main(int argc, char** argv)
 				double divisor = 0;
 				for (size_t i = 0; i != opssts.size(); ++i) {
 					opsst += opssts[i] * std::sqrt(threadCounts[i]);
-					totalWeightedOpsst[queue] += opssts[i] * std::sqrt(threadCounts[i]);
+					totalWeightedOpsst[queue.id] += opssts[i] * std::sqrt(threadCounts[i]);
 					divisor += std::sqrt(threadCounts[i]);
-					totalWeight[queue] += std::sqrt(threadCounts[i]);
+					totalWeight[queue.id] += std::sqrt(threadCounts[i]);
 				}
 				opsst /= divisor;
 				sayf(indent, "Operations per second per thread (weighted average): %7s\n\n", opsst == 0 ? "(n/a)" : pretty(opsst));
 				
 				indent -= 3;
 			}
-			if (queue_info[queue].token_support) {
+			if (queue.token_support) {
 				indent -= 4;
 			}
 		}
@@ -2077,13 +2089,13 @@ int main(int argc, char** argv)
 	
 	sayf(0, "Overall average operations per second per thread (where higher-concurrency runs have more weight):\n");
 	sayf(0, "(Take this summary with a grain of salt -- look at the individual benchmark results for a much\nbetter idea of how the queues measure up to each other):\n");
-	for (int queue = 0; queue != QUEUE_COUNT; ++queue) {
-		opsst = safe_divide(totalWeightedOpsst[queue], totalWeight[queue]);
-		if (queue_info[queue].notes != nullptr && queue_info[queue].notes[0] != '\0') {
-			sayf(4, "%s (%s): %7s\n", queue_info[queue].name, queue_info[queue].notes, opsst == 0 ? "(n/a)" : pretty(opsst));
+	for (auto const & queue : queue_info) {
+		opsst = safe_divide(totalWeightedOpsst[queue.id], totalWeight[queue.id]);
+		if (queue.notes != nullptr && queue.notes[0] != '\0') {
+			sayf(4, "%s (%s): %7s\n", queue.name, queue.notes, opsst == 0 ? "(n/a)" : pretty(opsst));
 		}
 		else {
-			sayf(4, "%s: %7s\n", queue_info[queue].name, opsst == 0 ? "(n/a)" : pretty(opsst));
+			sayf(4, "%s: %7s\n", queue.name, opsst == 0 ? "(n/a)" : pretty(opsst));
 		}
 	}
 	
