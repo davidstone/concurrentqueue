@@ -219,7 +219,7 @@ const queue_data_t queue_info[] = {
 		"moodycamel::ConcurrentQueue",
 		"including bulk",
 		true,
-		-1,		// no limit
+		-1,
 		{
 			bench_balanced,
 			bench_only_enqueue,
@@ -1975,9 +1975,11 @@ int main(int argc, char** argv)
 	
 	double opsst = 0;		// ops/s/thread
 	
-	std::size_t const queueCount = array_size<decltype(queue_info)>::value;
-	double totalWeightedOpsst[queueCount] = {};
-	double totalWeight[queueCount] = {};
+	struct weighted_t {
+		double opsPerSecondPerThread;
+		double total;
+	};
+	weighted_t weights[array_size<decltype(queue_info)>::value] = {};
 	
 	auto logicalCores = std::thread::hardware_concurrency();
 	
@@ -2146,10 +2148,11 @@ int main(int argc, char** argv)
 				opsst = 0;
 				double divisor = 0;
 				for (size_t i = 0; i != opssts.size(); ++i) {
+					auto & w = weights[queue.id];
 					opsst += opssts[i] * std::sqrt(threadCounts[i]);
-					totalWeightedOpsst[queue.id] += opssts[i] * std::sqrt(threadCounts[i]);
+					w.opsPerSecondPerThread += opssts[i] * std::sqrt(threadCounts[i]);
 					divisor += std::sqrt(threadCounts[i]);
-					totalWeight[queue.id] += std::sqrt(threadCounts[i]);
+					w.total += std::sqrt(threadCounts[i]);
 				}
 				opsst /= divisor;
 				sayf(indent, "Operations per second per thread (weighted average): %7s\n\n", opsst == 0 ? "(n/a)" : pretty(opsst));
@@ -2166,7 +2169,8 @@ int main(int argc, char** argv)
 	sayf(0, "Overall average operations per second per thread (where higher-concurrency runs have more weight):\n");
 	sayf(0, "(Take this summary with a grain of salt -- look at the individual benchmark results for a much\nbetter idea of how the queues measure up to each other):\n");
 	for (auto const & queue : queue_info) {
-		opsst = safe_divide(totalWeightedOpsst[queue.id], totalWeight[queue.id]);
+		auto const w = weights[queue.id];
+		opsst = safe_divide(w.opsPerSecondPerThread, w.total);
 		if (queue.notes[0] != '\0') {
 			sayf(4, "%s (%s): %7s\n", queue.name, queue.notes, opsst == 0 ? "(n/a)" : pretty(opsst));
 		}
