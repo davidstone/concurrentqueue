@@ -204,63 +204,139 @@ enum queue_id_t
 };
 
 struct queue_data_t {
+	queue_id_t id;
 	const char name[64];
 	const char notes[128];
 	const bool tokenSupport;
 	// -1 means no limit
 	const int maxThreads;
-	const bool benchmarkSupport[BENCHMARK_TYPE_COUNT];
-	queue_id_t id;
+	const std::vector<benchmark_type_t> benchmarks;
 };
 
 const queue_data_t queue_info[] = {
 	{
+		queue_moodycamel_ConcurrentQueue,
 		"moodycamel::ConcurrentQueue",
 		"including bulk",
 		true,
 		-1,		// no limit
-		{ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
-		queue_moodycamel_ConcurrentQueue
+		{
+			bench_balanced,
+			bench_only_enqueue,
+			bench_only_enqueue_prealloc,
+			bench_only_enqueue_bulk,
+			bench_only_enqueue_bulk_prealloc,
+			bench_only_dequeue,
+			bench_only_dequeue_bulk,
+			bench_mostly_enqueue,
+			bench_mostly_enqueue_bulk,
+			bench_mostly_dequeue,
+			bench_mostly_dequeue_bulk,
+			bench_spmc,
+			bench_spmc_preproduced,
+			bench_mpsc,
+			bench_empty_dequeue,
+			bench_enqueue_dequeue_pairs,
+			bench_heavy_concurrent,
+		},
 	},
 	{
+		queue_boost,
 		"boost::lockfree::queue",
 		"",
 		false,
 		-1,
-		{ 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1 },
-		queue_boost
+		{
+			bench_balanced,
+			bench_only_enqueue,
+			bench_only_enqueue_prealloc,
+			bench_only_dequeue,
+			bench_mostly_enqueue,
+			bench_mostly_dequeue,
+			bench_spmc,
+			bench_spmc_preproduced,
+			bench_mpsc,
+			bench_empty_dequeue,
+			bench_enqueue_dequeue_pairs,
+			bench_heavy_concurrent,
+		},
 	},
 	{
+		queue_tbb,
 		"tbb::concurrent_queue",
 		"",
 		false,
 		-1,
-		{ 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1 },
-		queue_tbb,
+		{
+			bench_balanced,
+			bench_only_enqueue,
+			bench_only_enqueue_prealloc,
+			bench_only_dequeue,
+			bench_mostly_enqueue,
+			bench_mostly_dequeue,
+			bench_spmc,
+			bench_spmc_preproduced,
+			bench_mpsc,
+			bench_empty_dequeue,
+			bench_enqueue_dequeue_pairs,
+			bench_heavy_concurrent,
+		},
 	},
 	{
+		queue_simplelockfree,
 		"SimpleLockFreeQueue",
 		"",
 		false,
 		-1,
-		{ 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1 },
-		queue_simplelockfree,
+		{
+			bench_balanced,
+			bench_only_enqueue,
+			bench_only_enqueue_prealloc,
+			bench_only_dequeue,
+			bench_mostly_enqueue,
+			bench_mostly_dequeue,
+			bench_spmc,
+			bench_spmc_preproduced,
+			bench_mpsc,
+			bench_empty_dequeue,
+			bench_enqueue_dequeue_pairs,
+			bench_heavy_concurrent,
+		},
 	},
 	{
+		queue_lockbased,
 		"LockBasedQueue",
 		"",
 		false,
 		-1,
-		{ 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1 },
-		queue_lockbased,
+		{
+			bench_balanced,
+			bench_only_enqueue,
+			bench_only_enqueue_prealloc,
+			bench_only_dequeue,
+			bench_mostly_enqueue,
+			bench_mostly_dequeue,
+			bench_spmc,
+			bench_spmc_preproduced,
+			bench_mpsc,
+			bench_empty_dequeue,
+			bench_enqueue_dequeue_pairs,
+			bench_heavy_concurrent,
+		},
 	},
 	{
+		queue_std,
 		"std::queue",
 		"single thread only",
 		false,
 		1,
-		{ 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0 },
-		queue_std,
+		{
+			bench_only_enqueue,
+			bench_only_enqueue_prealloc,
+			bench_only_dequeue,
+			bench_empty_dequeue,
+			bench_enqueue_dequeue_pairs,
+		},
 	},
 };
 
@@ -1912,13 +1988,13 @@ int main(int argc, char** argv)
 	}
 	
 	int indent = 0;
-	for (auto selectedIt = selectedBenchmarks.cbegin(); selectedIt != selectedBenchmarks.cend(); ++selectedIt) {
-		int benchmark = static_cast<int>(*selectedIt);
-		auto seed = randSeeds[benchmark];
+	for (auto const benchmark : selectedBenchmarks) {
+		auto seed = randSeeds[static_cast<unsigned>(benchmark)];
 		
 		bool anyQueueSupportsBenchmark = false;
 		for (auto const & queue : queue_info) {
-			if (queue.benchmarkSupport[benchmark]) {
+			auto const it = std::find(queue.benchmarks.begin(), queue.benchmarks.end(), benchmark);
+			if (it != queue.benchmarks.end()) {
 				anyQueueSupportsBenchmark = true;
 				break;
 			}
@@ -1943,7 +2019,7 @@ int main(int argc, char** argv)
 		for (auto const & queue : queue_info) {
 			sayf(indent, "> %s\n", queue.name);
 			
-			if (!queue.benchmarkSupport[benchmark]) {
+			if (std::find(queue.benchmarks.begin(), queue.benchmarks.end(), benchmark) == queue.benchmarks.end()) {
 				sayf(indent + 3, "(skipping, benchmark not supported...)\n\n");
 				continue;
 			}
