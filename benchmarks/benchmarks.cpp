@@ -73,7 +73,7 @@ enum benchmark_type_t
 	BENCHMARK_TYPE_COUNT
 };
 
-const char BENCHMARK_SHORT_NAMES[BENCHMARK_TYPE_COUNT][32] = {
+const std::string BENCHMARK_SHORT_NAMES[BENCHMARK_TYPE_COUNT] = {
 	"balanced",
 	"only_enqueue",
 	"only_enqueue_prealloc",
@@ -1838,7 +1838,7 @@ void printBenchmarkNames()
 	std::printf("   Supported benchmarks are:\n");
 	
 	for (int i = 0; i != BENCHMARK_TYPE_COUNT; ++i) {
-		std::printf("      %s\n", BENCHMARK_SHORT_NAMES[i]);
+		std::printf("      %s\n", BENCHMARK_SHORT_NAMES[i].c_str());
 	}
 }
 
@@ -1857,7 +1857,7 @@ int main(int argc, char** argv)
 	
 	std::map<std::string, benchmark_type_t> benchmarkMap;
 	for (int i = 0; i != BENCHMARK_TYPE_COUNT; ++i) {
-		benchmarkMap.insert(std::make_pair(std::string(BENCHMARK_SHORT_NAMES[i]), (benchmark_type_t)i));
+		benchmarkMap.emplace(BENCHMARK_SHORT_NAMES[i], (benchmark_type_t)i);
 	}
 	std::vector<benchmark_type_t> selectedBenchmarks;
 	
