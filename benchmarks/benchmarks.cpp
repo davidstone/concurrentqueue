@@ -206,10 +206,10 @@ enum queue_id_t
 struct queue_data_t {
 	const char name[64];
 	const char notes[128];
-	const bool token_support;
+	const bool tokenSupport;
 	// -1 means no limit
-	const int max_threads;
-	const bool benchmark_support[BENCHMARK_TYPE_COUNT];
+	const int maxThreads;
+	const bool benchmarkSupport[BENCHMARK_TYPE_COUNT];
 	queue_id_t id;
 };
 
@@ -1918,7 +1918,7 @@ int main(int argc, char** argv)
 		
 		bool anyQueueSupportsBenchmark = false;
 		for (auto const & queue : queue_info) {
-			if (queue.benchmark_support[benchmark]) {
+			if (queue.benchmarkSupport[benchmark]) {
 				anyQueueSupportsBenchmark = true;
 				break;
 			}
@@ -1943,19 +1943,19 @@ int main(int argc, char** argv)
 		for (auto const & queue : queue_info) {
 			sayf(indent, "> %s\n", queue.name);
 			
-			if (!queue.benchmark_support[benchmark]) {
+			if (!queue.benchmarkSupport[benchmark]) {
 				sayf(indent + 3, "(skipping, benchmark not supported...)\n\n");
 				continue;
 			}
 			
-			if (queue.token_support) {
+			if (queue.tokenSupport) {
 				indent += 4;
 			}
 			for (int useTokens = 0; useTokens != 2; ++useTokens) {
-				if (queue.token_support) {
+				if (queue.tokenSupport) {
 					sayf(indent, "%s tokens\n", useTokens == 0 ? "Without" : "With");
 				}
-				if (useTokens == 1 && !queue.token_support) {
+				if (useTokens == 1 && !queue.tokenSupport) {
 					continue;
 				}
 				indent += 3;
@@ -1972,7 +1972,7 @@ int main(int argc, char** argv)
 					if (logicalCores > 0 && (unsigned int)nthreads > 3 * logicalCores) {
 						continue;
 					}
-					if (queue.max_threads >= 0 && queue.max_threads < nthreads) {
+					if (queue.maxThreads >= 0 && queue.maxThreads < nthreads) {
 						continue;
 					}
 					
@@ -2001,7 +2001,7 @@ int main(int argc, char** argv)
 					}
 					//std::printf("maxOps: %llu\n", maxOps);
 					
-					int maxThreads = queue.max_threads;
+					int maxThreads = queue.maxThreads;
 					std::vector<BenchmarkResult> results(ITERATIONS);
 					for (int i = 0; i < ITERATIONS; ++i) {
 						double elapsed = 0.0;
@@ -2080,7 +2080,7 @@ int main(int argc, char** argv)
 				
 				indent -= 3;
 			}
-			if (queue.token_support) {
+			if (queue.tokenSupport) {
 				indent -= 4;
 			}
 		}
