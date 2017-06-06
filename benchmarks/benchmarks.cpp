@@ -2167,7 +2167,7 @@ int main(int argc, char** argv)
 	sayf(0, "(Take this summary with a grain of salt -- look at the individual benchmark results for a much\nbetter idea of how the queues measure up to each other):\n");
 	for (auto const & queue : queue_info) {
 		opsst = safe_divide(totalWeightedOpsst[queue.id], totalWeight[queue.id]);
-		if (queue.notes != nullptr && queue.notes[0] != '\0') {
+		if (queue.notes[0] != '\0') {
 			sayf(4, "%s (%s): %7s\n", queue.name, queue.notes, opsst == 0 ? "(n/a)" : pretty(opsst));
 		}
 		else {
