@@ -2102,8 +2102,8 @@ int main(int argc, char** argv)
 
 					int consideredCount = std::max(2, (int)(ITERATIONS * FASTEST_PERCENT_CONSIDERED / 100));
 					
-					double min = safe_divide(results[0].elapsedTime / 1000.0, (double)results[0].operations / measuredThreads);
-					double max = safe_divide(results[0].elapsedTime / 1000.0, (double)results[0].operations / measuredThreads);
+					auto min = std::numeric_limits<double>::max();
+					auto max = std::numeric_limits<double>::lowest();
 					double ops = 0;
 					double time = 0;
 					for (int i = 0; i != consideredCount; ++i) {
