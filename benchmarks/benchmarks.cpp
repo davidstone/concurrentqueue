@@ -513,6 +513,24 @@ counter_t determineMaxOpsForBenchmark(benchmark_type_t benchmark, int nthreads, 
 	}
 }
 
+counter_t determineMaxOpsForBenchmark(queue_id_t queueID, benchmark_type_t benchmark, int nthreads, bool useTokens, unsigned int seed) {
+	switch (queueID) {
+	case queue_moodycamel_ConcurrentQueue:
+		return determineMaxOpsForBenchmark<moodycamel::ConcurrentQueue<int, Traits>>(benchmark, nthreads, useTokens, seed);
+	case queue_lockbased:
+		return determineMaxOpsForBenchmark<LockBasedQueue<int>>(benchmark, nthreads, useTokens, seed);
+	case queue_simplelockfree:
+		return determineMaxOpsForBenchmark<SimpleLockFreeQueue<int>>(benchmark, nthreads, useTokens, seed);
+	case queue_boost:
+		return determineMaxOpsForBenchmark<BoostQueueWrapper<int>>(benchmark, nthreads, useTokens, seed);
+	case queue_tbb:
+		return determineMaxOpsForBenchmark<TbbQueueWrapper<int>>(benchmark, nthreads, useTokens, seed);
+	case queue_std:
+		return determineMaxOpsForBenchmark<StdQueueWrapper<int>>(benchmark, nthreads, useTokens, seed);
+	default:
+		assert(false && "There should be a case here for every queue in the benchmarks!");
+	}
+}
 
 // Returns time elapsed, in (fractional) milliseconds
 template<typename TQueue>
@@ -1725,6 +1743,24 @@ double runBenchmark(benchmark_type_t benchmark, int nthreads, bool useTokens, un
 	return result;
 }
 
+double runBenchmark(queue_id_t queueID, benchmark_type_t benchmark, int nthreads, bool useTokens, unsigned int seed, counter_t maxOps, int maxThreads, counter_t& out_opCount) {
+	switch (queueID) {
+	case queue_moodycamel_ConcurrentQueue:
+		return runBenchmark<moodycamel::ConcurrentQueue<int, Traits>>(benchmark, nthreads, useTokens, seed, maxOps, maxThreads, out_opCount);
+	case queue_lockbased:
+		return runBenchmark<LockBasedQueue<int>>(benchmark, nthreads, useTokens, seed, maxOps, maxThreads, out_opCount);
+	case queue_simplelockfree:
+		return runBenchmark<SimpleLockFreeQueue<int>>(benchmark, nthreads, useTokens, seed, maxOps, maxThreads, out_opCount);
+	case queue_boost:
+		return runBenchmark<BoostQueueWrapper<int>>(benchmark, nthreads, useTokens, seed, maxOps, maxThreads, out_opCount);
+	case queue_tbb:
+		return runBenchmark<TbbQueueWrapper<int>>(benchmark, nthreads, useTokens, seed, maxOps, maxThreads, out_opCount);
+	case queue_std:
+		return runBenchmark<StdQueueWrapper<int>>(benchmark, nthreads, useTokens, seed, maxOps, maxThreads, out_opCount);
+	default:
+		assert(false && "There should be a case here for every queue in the benchmarks!");
+	}
+}
 
 const char* LOG_FILE = "benchmarks.log";
 std::ofstream* logOut;
@@ -1991,7 +2027,7 @@ int main(int argc, char** argv)
 	
 	int indent = 0;
 	for (auto const benchmark : selectedBenchmarks) {
-		auto seed = randSeeds[static_cast<unsigned>(benchmark)];
+		auto seed = randSeeds[benchmark];
 		
 		bool anyQueueSupportsBenchmark = false;
 		for (auto const & queue : queue_info) {
@@ -2054,60 +2090,14 @@ int main(int argc, char** argv)
 						continue;
 					}
 					
-					counter_t maxOps = 0;
-					switch (queue.id) {
-					case queue_moodycamel_ConcurrentQueue:
-						maxOps = determineMaxOpsForBenchmark<moodycamel::ConcurrentQueue<int, Traits>>((benchmark_type_t)benchmark, nthreads, useTokens, seed);
-						break;
-					case queue_lockbased:
-						maxOps = determineMaxOpsForBenchmark<LockBasedQueue<int>>((benchmark_type_t)benchmark, nthreads, useTokens, seed);
-						break;
-					case queue_simplelockfree:
-						maxOps = determineMaxOpsForBenchmark<SimpleLockFreeQueue<int>>((benchmark_type_t)benchmark, nthreads, useTokens, seed);
-						break;
-					case queue_boost:
-						maxOps = determineMaxOpsForBenchmark<BoostQueueWrapper<int>>((benchmark_type_t)benchmark, nthreads, useTokens, seed);
-						break;
-					case queue_tbb:
-						maxOps = determineMaxOpsForBenchmark<TbbQueueWrapper<int>>((benchmark_type_t)benchmark, nthreads, useTokens, seed);
-						break;
-					case queue_std:
-						maxOps = determineMaxOpsForBenchmark<StdQueueWrapper<int>>((benchmark_type_t)benchmark, nthreads, useTokens, seed);
-						break;
-					default:
-						assert(false && "There should be a case here for every queue in the benchmarks!");
-					}
+					const counter_t maxOps = determineMaxOpsForBenchmark(queue.id, benchmark, nthreads, useTokens, seed);
 					//std::printf("maxOps: %llu\n", maxOps);
 					
 					int maxThreads = queue.maxThreads;
 					std::vector<BenchmarkResult> results(ITERATIONS);
 					for (int i = 0; i < ITERATIONS; ++i) {
-						double elapsed = 0.0;
 						counter_t ops = 0;
-						
-						switch (queue.id) {
-						case queue_moodycamel_ConcurrentQueue:
-							elapsed = runBenchmark<moodycamel::ConcurrentQueue<int, Traits>>((benchmark_type_t)benchmark, nthreads, useTokens, seed, maxOps, maxThreads, ops);
-							break;
-						case queue_lockbased:
-							elapsed = runBenchmark<LockBasedQueue<int>>((benchmark_type_t)benchmark, nthreads, useTokens, seed, maxOps, maxThreads, ops);
-							break;
-						case queue_simplelockfree:
-							elapsed = runBenchmark<SimpleLockFreeQueue<int>>((benchmark_type_t)benchmark, nthreads, useTokens, seed, maxOps, maxThreads, ops);
-							break;
-						case queue_boost:
-							elapsed = runBenchmark<BoostQueueWrapper<int>>((benchmark_type_t)benchmark, nthreads, useTokens, seed, maxOps, maxThreads, ops);
-							break;
-						case queue_tbb:
-							elapsed = runBenchmark<TbbQueueWrapper<int>>((benchmark_type_t)benchmark, nthreads, useTokens, seed, maxOps, maxThreads, ops);
-							break;
-						case queue_std:
-							elapsed = runBenchmark<StdQueueWrapper<int>>((benchmark_type_t)benchmark, nthreads, useTokens, seed, maxOps, maxThreads, ops);
-							break;
-						default:
-							assert(false && "There should be a case here for every queue in the benchmarks!");
-						}
-
+						double elapsed = runBenchmark(queue.id, benchmark, nthreads, useTokens, seed, maxOps, maxThreads, ops);
 						results[i].elapsedTime = elapsed;
 						results[i].operations = ops;
 					}
