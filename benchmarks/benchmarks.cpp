@@ -546,8 +546,7 @@ BenchmarkResult runBenchmark(benchmark_type_t benchmark, int nthreads, bool useT
 		// Measures the average operation speed with multiple symmetrical threads under reasonable load
 		TQueue q;
 		std::vector<SimpleThread> threads(nthreads);
-		std::vector<counter_t> ops(nthreads);
-		std::vector<double> times(nthreads);
+		std::vector<BenchmarkResult> results(nthreads);
 		std::atomic<int> ready(0);
 		for (int tid = 0; tid != nthreads; ++tid) {
 			threads[tid] = SimpleThread([&](int id) {
@@ -559,8 +558,9 @@ BenchmarkResult runBenchmark(benchmark_type_t benchmark, int nthreads, bool useT
 				SystemTime start;
 				RNG_t rng(randSeed * (id + 1));
 				std::uniform_int_distribution<int> rand(0, 20);
-				ops[id] = 0;
-				times[id] = 0;
+				auto & result = results[id];
+				result.operations = 0;
+				result.elapsedTime = 0;
 				typename TQueue::consumer_token_t consTok(q);
 				typename TQueue::producer_token_t prodTok(q);
 			
@@ -583,8 +583,8 @@ BenchmarkResult runBenchmark(benchmark_type_t benchmark, int nthreads, bool useT
 								q.enqueue(i);
 							}
 						}
-						times[id] += getTimeDelta(start);
-						++ops[id];
+						result.elapsedTime += getTimeDelta(start);
+						++result.operations;
 					}
 				}
 			}, tid);
@@ -593,8 +593,9 @@ BenchmarkResult runBenchmark(benchmark_type_t benchmark, int nthreads, bool useT
 		result.elapsedTime = 0;
 		for (int tid = 0; tid != nthreads; ++tid) {
 			threads[tid].join();
-			result.operations += ops[tid];
-			result.elapsedTime += times[tid];
+			auto & r = results[tid];
+			result.operations += r.operations;
+			result.elapsedTime += r.elapsedTime;
 		}
 		int item;
 		forceNoOptimizeDummy = q.try_dequeue(item) ? 1 : 0;
