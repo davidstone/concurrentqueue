@@ -32,6 +32,8 @@
 #include "../tests/common/systemtime.h"
 #include "cpuid.h"
 
+namespace {
+
 using namespace moodycamel;
 
 
@@ -1878,6 +1880,7 @@ void printBenchmarkNames()
 	}
 }
 
+}	// namespace
 
 int main(int argc, char** argv)
 {
