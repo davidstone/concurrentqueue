@@ -2009,8 +2009,6 @@ int main(int argc, char** argv)
 		randSeeds[i] = std::rand() * (i + 1) + 1;
 	}
 	
-	double opsst = 0;		// ops/s/thread
-	
 	struct weighted_t {
 		double opsPerSecondPerThread;
 		double total;
@@ -2117,28 +2115,28 @@ int main(int argc, char** argv)
 					
 					double avg = safe_divide(time / 1000.0, ops / measuredThreads);
 					double opsPerSecond = safe_divide(ops, time / 1000.0);
-					opsst = opsPerSecond / (double)measuredThreads;
+					const double opsPerSecondPerThread = opsPerSecond / (double)measuredThreads;
 					
-					opssts.push_back(opsst);
+					opssts.push_back(opsPerSecondPerThread);
 					threadCounts.push_back(measuredThreads);
 					
-					sayf(indent, "%-3d %7s:  Avg: %7ss  Range: [%7ss, %7ss]  Ops/s: %7s  Ops/s/t: %7s\n", nthreads, nthreads != 1 ? "threads" : "thread", pretty(avg), pretty(min), pretty(max), pretty(opsPerSecond), pretty(opsst));
+					sayf(indent, "%-3d %7s:  Avg: %7ss  Range: [%7ss, %7ss]  Ops/s: %7s  Ops/s/t: %7s\n", nthreads, nthreads != 1 ? "threads" : "thread", pretty(avg), pretty(min), pretty(max), pretty(opsPerSecond), pretty(opsPerSecondPerThread));
 					if (nthreads == 1 && BENCHMARK_SINGLE_THREAD_NOTES[benchmark][0] != '\0') {
 						sayf(indent + 7, "^ Note: %s\n", BENCHMARK_SINGLE_THREAD_NOTES[benchmark]);
 					}
 				}
 				
-				opsst = 0;
+				double opsPerSecondPerThread = 0;
 				double divisor = 0;
 				for (size_t i = 0; i != opssts.size(); ++i) {
 					auto & w = weights[queue.id];
-					opsst += opssts[i] * std::sqrt(threadCounts[i]);
+					opsPerSecondPerThread += opssts[i] * std::sqrt(threadCounts[i]);
 					w.opsPerSecondPerThread += opssts[i] * std::sqrt(threadCounts[i]);
 					divisor += std::sqrt(threadCounts[i]);
 					w.total += std::sqrt(threadCounts[i]);
 				}
-				opsst /= divisor;
-				sayf(indent, "Operations per second per thread (weighted average): %7s\n\n", opsst == 0 ? "(n/a)" : pretty(opsst));
+				opsPerSecondPerThread /= divisor;
+				sayf(indent, "Operations per second per thread (weighted average): %7s\n\n", opsPerSecondPerThread == 0 ? "(n/a)" : pretty(opsPerSecondPerThread));
 				
 				indent -= 3;
 			}
@@ -2153,12 +2151,12 @@ int main(int argc, char** argv)
 	sayf(0, "(Take this summary with a grain of salt -- look at the individual benchmark results for a much\nbetter idea of how the queues measure up to each other):\n");
 	for (auto const & queue : queue_info) {
 		auto const w = weights[queue.id];
-		opsst = safe_divide(w.opsPerSecondPerThread, w.total);
+		const double opsPerSecondPerThread = safe_divide(w.opsPerSecondPerThread, w.total);
 		if (queue.notes[0] != '\0') {
-			sayf(4, "%s (%s): %7s\n", queue.name, queue.notes, opsst == 0 ? "(n/a)" : pretty(opsst));
+			sayf(4, "%s (%s): %7s\n", queue.name, queue.notes, opsPerSecondPerThread == 0 ? "(n/a)" : pretty(opsPerSecondPerThread));
 		}
 		else {
-			sayf(4, "%s: %7s\n", queue.name, opsst == 0 ? "(n/a)" : pretty(opsst));
+			sayf(4, "%s: %7s\n", queue.name, opsPerSecondPerThread == 0 ? "(n/a)" : pretty(opsPerSecondPerThread));
 		}
 	}
 	
