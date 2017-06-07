@@ -2107,16 +2107,12 @@ int main(int argc, char** argv)
 					double ops = 0;
 					double time = 0;
 					for (int i = 0; i != consideredCount; ++i) {
-						double msPerOperation = safe_divide(results[i].elapsedTime / 1000.0, (double)results[i].operations / measuredThreads);
-						if (msPerOperation < min) {
-							min = msPerOperation;
-						}
-						else if (msPerOperation > max) {
-							max = msPerOperation;
-						}
-						
-						time += results[i].elapsedTime;
-						ops += results[i].operations;
+						const auto & result = results[i];
+						const double msPerOperation = safe_divide(result.elapsedTime / 1000.0, (double)result.operations / measuredThreads);
+						min = std::min(msPerOperation, min);
+						max = std::max(msPerOperation, max);
+						time += result.elapsedTime;
+						ops += result.operations;
 					}
 					
 					double avg = safe_divide(time / 1000.0, ops / measuredThreads);
