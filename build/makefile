@@ -7,7 +7,7 @@ include makefile.inc
 BASE_OPTS = -pthread
 
 DEBUG_OPTS = -g -O0   # -DMOODYCAMEL_QUEUE_INTERNAL_DEBUG
-RELEASE_OPTS = -O3 -g -DNDEBUG
+RELEASE_OPTS = -O3 -g -march=native -DNDEBUG
 
 ifeq ($(OS),Windows_NT)
 	PLATFORM_OPTS = -static
@@ -39,7 +39,7 @@ bin/fuzztests$(EXT): ../concurrentqueue.h ../tests/fuzztests/fuzztests.cpp ../te
 
 bin/benchmarks$(EXT): bin/libtbb.a ../concurrentqueue.h ../benchmarks/benchmarks.cpp ../benchmarks/cpuid.h ../benchmarks/cpuid.cpp ../benchmarks/lockbasedqueue.h ../benchmarks/simplelockfree.h ../tests/common/simplethread.h ../tests/common/simplethread.cpp ../tests/common/systemtime.h ../tests/common/systemtime.cpp makefile
 	test -d bin || mkdir bin
-	g++ -std=c++11 -Wall -pedantic-errors -Wpedantic $(BENCH_OPTS) -I../benchmarks ../benchmarks/cpuid.cpp ../tests/common/simplethread.cpp ../tests/common/systemtime.cpp ../benchmarks/benchmarks.cpp -o bin/benchmarks$(EXT) -Lbin -ltbb $(LD_OPTS)
+	g++ -std=c++14 -Wall -pedantic-errors -Wpedantic $(BENCH_OPTS) -I../benchmarks -I../benchmarks/concurrent ../benchmarks/cpuid.cpp ../tests/common/simplethread.cpp ../tests/common/systemtime.cpp ../benchmarks/benchmarks.cpp -o bin/benchmarks$(EXT) -Lbin -ltbb -lboost_system -lboost_thread $(LD_OPTS)
 	
 bin/libtbb.a: makefile
 	test -d bin || mkdir bin
